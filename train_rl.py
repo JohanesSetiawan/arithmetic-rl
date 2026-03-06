@@ -58,7 +58,7 @@ def main() -> None:
         d_model=256,
         n_heads=8,
         n_layers=6,
-        ffn_dim=256,
+        ffn_dim=model_config.d_model * 4,
         dropout=0.1,
     )
 
