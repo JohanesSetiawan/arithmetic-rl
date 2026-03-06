@@ -56,8 +56,8 @@ def main() -> None:
     model_config = ModelConfig(
         vocab_size=20,
         d_model=256,
-        n_heads=6,
-        n_layers=4,
+        n_heads=8,
+        n_layers=6,
         ffn_dim=256,
         dropout=0.1,
     )
