@@ -13,6 +13,7 @@ import copy
 import json
 import random
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
@@ -28,10 +29,57 @@ from .curriculum import CurriculumManager
 from .environment import parse_answer, rollout_question
 from .grpo_loss import GRPOLoss
 from .logprobs import compute_answer_log_probs_batch
+from .wandb_logger import WandbLogger
 
 
 class GRPOTrainer:
     """Pure RL arithmetic trainer using GRPO."""
+
+    @staticmethod
+    def _group_train_metrics(metrics: dict) -> dict[str, dict[str, float | int]]:
+        return {
+            "train/loss": {
+                "total": metrics["loss"],
+                "kl": metrics["kl"],
+            },
+            "train/reward": {
+                "mean": metrics["mean_reward"],
+                "std": metrics["reward_std"],
+                "min": metrics["reward_min"],
+                "max": metrics["reward_max"],
+            },
+            "train/system": {
+                "grad_norm": metrics["grad_norm"],
+                "learning_rate": metrics["learning_rate"],
+                "step_time_sec": metrics["step_time_sec"],
+            },
+            "train/data": {
+                "num_questions": metrics["num_questions"],
+                "num_rollouts": metrics["num_rollouts"],
+                "num_updates": metrics["num_updates"],
+                "train_pool_size": metrics["train_pool_size"],
+                "val_pool_size": metrics["val_pool_size"],
+            },
+            "train/curriculum": {
+                "stage": metrics["stage"],
+            },
+        }
+
+    @staticmethod
+    def _group_eval_metrics(metrics: dict) -> dict[str, dict[str, float | int]]:
+        return {
+            "eval/accuracy": {
+                "val_acc": metrics["val_acc"],
+            },
+            "eval/data": {
+                "train_pool_size": metrics["train_pool_size"],
+                "val_pool_size": metrics["val_pool_size"],
+            },
+            "eval/curriculum": {
+                "stage": metrics["stage"],
+                "stage_advanced": metrics["stage_advanced"],
+            },
+        }
 
     def __init__(self, model_config: ModelConfig, rl_config: RLConfig) -> None:
         self.cfg = rl_config
@@ -67,6 +115,19 @@ class GRPOTrainer:
             held_out_fraction=0.10,
             seed=rl_config.seed,
         )
+        wandb_config = asdict(rl_config)
+        wandb_config.pop("wandb_token", None)
+        self.wandb = WandbLogger(
+            enabled=rl_config.wandb_enabled,
+            project=rl_config.wandb_project,
+            entity=rl_config.wandb_entity,
+            run_name=rl_config.wandb_run_name,
+            token=rl_config.wandb_token,
+            config={
+                "model": asdict(model_config),
+                "rl": wandb_config,
+            },
+        )
         self.global_step = 0
         self._log:       list[dict] = []
 
@@ -82,39 +143,56 @@ class GRPOTrainer:
         cfg = self.cfg
         print(f"\n[GRPOTrainer] Training for {cfg.total_steps} steps\n")
 
-        for step in range(1, cfg.total_steps + 1):
-            self.global_step = step
-            t0 = time.time()
-            metrics = self._train_step()
-            elapsed = time.time() - t0
+        try:
+            for step in range(1, cfg.total_steps + 1):
+                self.global_step = step
+                t0 = time.time()
+                metrics = self._train_step()
+                elapsed = time.time() - t0
+                metrics["step_time_sec"] = elapsed
 
-            if step % cfg.log_interval == 0:
-                print(
-                    f"step {step:5d} | "
-                    f"loss={metrics['loss']:.4f} | "
-                    f"kl={metrics['kl']:.4f} | "
-                    f"reward={metrics['mean_reward']:.3f} | "
-                    f"stage={self.curriculum.stage} | "
-                    f"{elapsed:.1f}s"
-                )
-            self._log.append({"step": step, **metrics})
+                if step % cfg.log_interval == 0:
+                    print(
+                        f"step {step:5d} | "
+                        f"loss={metrics['loss']:.4f} | "
+                        f"kl={metrics['kl']:.4f} | "
+                        f"reward={metrics['mean_reward']:.3f} | "
+                        f"stage={self.curriculum.stage} | "
+                        f"{elapsed:.1f}s"
+                    )
 
-            if step % cfg.eval_interval == 0:
-                val_acc = self._evaluate()
-                print(
-                    f"  [eval] val_acc={val_acc:.1%}  {self.curriculum.info()}")
-                self.curriculum.maybe_advance(
-                    val_acc,
-                    stage1_thresh=cfg.stage1_acc_threshold,
-                    stage2_thresh=cfg.stage2_acc_threshold,
-                )
+                self._log.append({"event": "train", "step": step, **metrics})
+                self.wandb.log_groups(step, self._group_train_metrics(metrics))
 
-            if step % cfg.save_interval == 0:
-                self._save_checkpoint(step)
+                if step % cfg.eval_interval == 0:
+                    val_acc = self._evaluate()
+                    stage_advanced = self.curriculum.maybe_advance(
+                        val_acc,
+                        stage1_thresh=cfg.stage1_acc_threshold,
+                        stage2_thresh=cfg.stage2_acc_threshold,
+                    )
+                    eval_metrics = {
+                        "val_acc": val_acc,
+                        "stage": self.curriculum.stage,
+                        "stage_advanced": int(stage_advanced),
+                        "val_pool_size": len(self.curriculum.val_pool),
+                        "train_pool_size": len(self.curriculum.train_pool),
+                    }
+                    print(
+                        f"  [eval] val_acc={val_acc:.1%}  {self.curriculum.info()}")
+                    self._log.append(
+                        {"event": "eval", "step": step, **eval_metrics})
+                    self.wandb.log_groups(
+                        step, self._group_eval_metrics(eval_metrics))
 
-        print("\n[GRPOTrainer] Training complete.")
-        self._save_checkpoint(self.global_step, name="final")
-        self._save_log()
+                if step % cfg.save_interval == 0:
+                    self._save_checkpoint(step)
+
+            print("\n[GRPOTrainer] Training complete.")
+            self._save_checkpoint(self.global_step, name="final")
+            self._save_log()
+        finally:
+            self.wandb.finish()
 
     # ── Training step ─────────────────────────────────────────────────────────
 
@@ -147,6 +225,7 @@ class GRPOTrainer:
         self.optimizer.zero_grad()
 
         total_loss, total_kl, n = 0.0, 0.0, 0
+        grad_norm = 0.0
 
         for exp in buffer:
             exp = exp.to(self.device)
@@ -175,17 +254,32 @@ class GRPOTrainer:
             n += 1
 
         if n > 0:
-            clip_grad_norm_(self.model.parameters(), cfg.grad_clip)
+            grad_norm = float(clip_grad_norm_(
+                self.model.parameters(), cfg.grad_clip).item())
             self.optimizer.step()
 
         mean_reward = sum(all_rewards) / max(len(all_rewards), 1)
+        reward_min = min(all_rewards) if all_rewards else 0.0
+        reward_max = max(all_rewards) if all_rewards else 0.0
+        reward_var = sum((reward - mean_reward) **
+                         2 for reward in all_rewards) / max(len(all_rewards), 1)
         n = max(n, 1)
 
         return {
-            "loss":        total_loss / n,
-            "kl":          total_kl / n,
-            "mean_reward": mean_reward,
-            "stage":       self.curriculum.stage,
+            "loss":             total_loss / n,
+            "kl":               total_kl / n,
+            "mean_reward":      mean_reward,
+            "reward_std":       reward_var ** 0.5,
+            "reward_min":       reward_min,
+            "reward_max":       reward_max,
+            "stage":            self.curriculum.stage,
+            "grad_norm":        grad_norm,
+            "learning_rate":    self.optimizer.param_groups[0]["lr"],
+            "num_questions":    len(questions),
+            "num_rollouts":     len(all_rewards),
+            "num_updates":      n,
+            "train_pool_size":  len(self.curriculum.train_pool),
+            "val_pool_size":    len(self.curriculum.val_pool),
         }
 
     # ── Evaluation ────────────────────────────────────────────────────────────

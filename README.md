@@ -9,6 +9,7 @@
 - [Arithmetic RL — Pure GRPO from Scratch](#arithmetic-rl--pure-grpo-from-scratch)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
+  - [WandB Logging](#wandb-logging)
   - [Architecture](#architecture)
     - [Hyperparameters](#hyperparameters)
     - [Token Embedding](#token-embedding)
@@ -43,6 +44,34 @@
 | Training signal | Scalar reward only (no teacher forcing, no cross-entropy loss) |
 
 The model is a standard autoregressive language model. Given a question like `47 + 83 = ?`, it generates an answer token-by-token. The only learning signal is whether its answer is numerically correct.
+
+## WandB Logging
+
+Training now supports optional real-time Weights & Biases logging. If you do not pass any WandB-related flag, nothing is recorded to WandB and training behaves as before.
+
+Example:
+
+```bash
+python train_rl.py --device cuda --steps 10000 --wandb-token YOUR_WANDB_TOKEN
+```
+
+Optional WandB flags:
+
+- `--wandb-token` to log in directly with an API key.
+- `--wandb-project` to override the default project name `arithmetic-rl`.
+- `--wandb-entity` to send the run to a specific team or user.
+- `--wandb-run-name` to set a custom run name.
+
+All training and evaluation metrics emitted by the trainer are logged live with `trainer/step` as the WandB x-axis.
+
+The WandB charts are grouped with explicit namespaces:
+
+- `train/loss/*` for `total` and `kl`.
+- `train/reward/*` for `mean`, `std`, `min`, and `max`.
+- `train/system/*` for `grad_norm`, `learning_rate`, and `step_time_sec`.
+- `train/data/*` for rollout counts and pool sizes.
+- `train/curriculum/*` for stage tracking.
+- `eval/accuracy/*`, `eval/data/*`, and `eval/curriculum/*` for validation-side metrics.
 
 ---
 

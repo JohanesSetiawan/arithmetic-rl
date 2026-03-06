@@ -10,15 +10,14 @@ Usage:
     python train_rl.py --group-size 16 --lr 3e-5 --questions-per-step 16
 """
 
+from src.rl.trainer import GRPOTrainer
+from src.rl.config import RLConfig
+from src.model.config import ModelConfig
 import argparse
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-
-from src.model.config import ModelConfig
-from src.rl.config import RLConfig
-from src.rl.trainer import GRPOTrainer
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,11 +34,24 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--questions-per-step", type=int,   default=8)
     p.add_argument("--eval-interval",      type=int,   default=50)
     p.add_argument("--seed",               type=int,   default=42)
+    p.add_argument("--wandb-token",        default=None)
+    p.add_argument("--wandb-project",      default=None)
+    p.add_argument("--wandb-entity",       default=None)
+    p.add_argument("--wandb-run-name",     default=None)
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    wandb_enabled = any(
+        value is not None
+        for value in (
+            args.wandb_token,
+            args.wandb_project,
+            args.wandb_entity,
+            args.wandb_run_name,
+        )
+    )
 
     model_config = ModelConfig(
         vocab_size=20,
@@ -63,6 +75,12 @@ def main() -> None:
         questions_per_step=args.questions_per_step,
         eval_interval=args.eval_interval,
         seed=args.seed,
+        wandb_enabled=wandb_enabled,
+        wandb_project=args.wandb_project or (
+            "arithmetic-rl" if wandb_enabled else None),
+        wandb_entity=args.wandb_entity,
+        wandb_run_name=args.wandb_run_name,
+        wandb_token=args.wandb_token,
     )
 
     GRPOTrainer(model_config, rl_config).train()

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -39,3 +40,10 @@ class RLConfig:
     seed:   int = 42
     device: str = "cuda"  # or "cpu"
     entropy_weight: float = 0.0  # β_ent: entropy bonus coefficient
+
+    # ── WandB (optional) ──────────────────────────────────────────────────────
+    wandb_enabled:  bool = False
+    wandb_project:  Optional[str] = None
+    wandb_entity:   Optional[str] = None
+    wandb_run_name: Optional[str] = None
+    wandb_token:    Optional[str] = None
