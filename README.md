@@ -117,11 +117,11 @@ $$R_m^{(i)} = \begin{pmatrix} \cos(m\theta_i) & -\sin(m\theta_i) \\ \sin(m\theta
 
 **Applied to queries and keys:**
 
-$$\tilde{\mathbf{q}}_{m,h} = \mathbf{q}_{m,h} \odot \cos(m\boldsymbol{\theta}) + \text{rotate\_half}(\mathbf{q}_{m,h}) \odot \sin(m\boldsymbol{\theta})$$
+$$\tilde{\mathbf{q}}_{m,h} = \mathbf{q}_{m,h} \odot \cos(m\boldsymbol{\theta}) + \text{rotate}\_\text{half}(\mathbf{q}_{m,h}) \odot \sin(m\boldsymbol{\theta})$$
 
-$$\tilde{\mathbf{k}}_{m,h} = \mathbf{k}_{m,h} \odot \cos(m\boldsymbol{\theta}) + \text{rotate\_half}(\mathbf{k}_{m,h}) \odot \sin(m\boldsymbol{\theta})$$
+$$\tilde{\mathbf{k}}_{m,h} = \mathbf{k}_{m,h} \odot \cos(m\boldsymbol{\theta}) + \text{rotate}\_\text{half}(\mathbf{k}_{m,h}) \odot \sin(m\boldsymbol{\theta})$$
 
-where $\text{rotate\_half}(\mathbf{x}) = [-x_2 \| x_1]$ splits and negates the second half.
+where $\text{rotate}\_\text{half}(\mathbf{x}) = [-x_2 \| x_1]$ splits and negates the second half.
 
 **Key property:** The inner product between a query at position $m$ and a key at position $n$ depends only on their relative displacement $m - n$:
 
