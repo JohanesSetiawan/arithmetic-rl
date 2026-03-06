@@ -23,7 +23,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="GRPO arithmetic RL trainer")
     p.add_argument("--dataset",            default="data/dataset.jsonl")
-    p.add_argument("--checkpoint-dir",     default="checkpoints/rl")
+    p.add_argument("--checkpoint-dir",     default="ckpt/rl")
     p.add_argument("--device",             default="cpu")
     p.add_argument("--steps",              type=int,   default=5000)
     p.add_argument("--lr",                 type=float, default=5e-5)
@@ -55,10 +55,10 @@ def main() -> None:
 
     model_config = ModelConfig(
         vocab_size=20,
-        d_model=128,
-        n_heads=4,
+        d_model=256,
+        n_heads=6,
         n_layers=4,
-        ffn_dim=512,
+        ffn_dim=256,
         dropout=0.1,
     )
 
