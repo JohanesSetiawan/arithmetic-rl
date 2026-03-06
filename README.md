@@ -195,7 +195,7 @@ $$\mu_r = \frac{1}{G}\sum_{j=1}^{G} r_j, \qquad \sigma_r = \sqrt{\frac{1}{G}\sum
 
 Identical to PPO-Clip (Schulman et al., 2017). For each answer token at position $t$ in completion $i$:
 
-$$\rho_{i,t} = \frac{\pi_\theta(o_{i,t} \mid q, o_{i,<t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,<t})} = \exp\!\left(\log\pi_\theta - \log\pi_{\theta_{\text{old}}}\right)$$
+$$\rho_{i,t} = \frac{\pi_\theta(o_{i,t} \mid q, o_{i,\lt t})}{\pi_{\theta_{\text{old}}}(o_{i,t} \mid q, o_{i,\lt t})} = \exp\!\left(\log\pi_\theta - \log\pi_{\theta_{\text{old}}}\right)$$
 
 $$\mathcal{L}_{\text{clip}}^{(i,t)} = -\min\!\left(\rho_{i,t}\,\hat{A}_i,\ \text{clip}(\rho_{i,t},\, 1-\varepsilon,\, 1+\varepsilon)\,\hat{A}_i\right)$$
 
@@ -326,11 +326,11 @@ For step = 1 … T:
 
 **Key implementation detail — log-prob indexing:**
 
-During the update, we recompute $\log\pi_\theta(o_{i,t} \mid q, o_{i,<t})$ via a single batched forward pass. Given logits $\mathbf{Z} \in \mathbb{R}^{G \times T \times V}$:
+During the update, we recompute $\log\pi_\theta(o_{i,t} \mid q, o_{i,\lt t})$ via a single batched forward pass. Given logits $\mathbf{Z} \in \mathbb{R}^{G \times T \times V}$:
 
 $$\log\pi_\theta(o_{i,t}) = \log\text{softmax}(\mathbf{Z}_{i,\, p+t-1,\, :})[o_{i,t}]$$
 
-where $p = \text{prompt\_len}$. The offset $p - 1$ is critical: $\mathbf{Z}_{i, j, :}$ predicts token at position $j + 1$, so the first answer token at position $p$ is predicted by $\mathbf{Z}_{i, p-1, :}$.
+where $p = \text{prompt}\_\text{len}$. The offset $p - 1$ is critical: $\mathbf{Z}_{i, j, :}$ predicts token at position $j + 1$, so the first answer token at position $p$ is predicted by $\mathbf{Z}_{i, p-1, :}$.
 
 ---
 
