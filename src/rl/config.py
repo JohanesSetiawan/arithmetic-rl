@@ -27,8 +27,8 @@ class RLConfig:
     temperature:    float = 1.0  # sampling temperature (1.0 = full entropy)
 
     # ── Curriculum ────────────────────────────────────────────────────────────
-    stage1_acc_threshold: float = 0.65
-    stage2_acc_threshold: float = 0.70
+    stage1_acc_threshold: float = 0.50
+    stage2_acc_threshold: float = 0.60
 
     # ── Evaluation & logging ──────────────────────────────────────────────────
     eval_interval: int = 50
